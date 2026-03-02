@@ -104,11 +104,16 @@ def create_blueprint(ctx):
     def api_test_all():
         return jsonify(ctx["runtime_config_validation"](run_network_tests=True))
 
+    def _unmask(value, fallback):
+        """Return fallback when value is the masked placeholder."""
+        masked = getattr(config, "MASKED_SECRET", "••••••••")
+        return fallback if (not value or value == masked) else value
+
     @bp.route("/api/test/prowlarr", methods=["POST"])
     def api_test_prowlarr():
         data = request.json or {}
         url = data.get("url", "").rstrip("/")
-        api_key = data.get("api_key", "")
+        api_key = _unmask(data.get("api_key", ""), config.PROWLARR_API_KEY)
         return jsonify(ctx["test_prowlarr_connection"](url, api_key))
 
     @bp.route("/api/test/qbittorrent", methods=["POST"])
@@ -116,21 +121,21 @@ def create_blueprint(ctx):
         data = request.json or {}
         url = data.get("url", "").rstrip("/")
         user = data.get("user", "admin")
-        password = data.get("pass", "")
+        password = _unmask(data.get("pass", ""), config.QB_PASS)
         return jsonify(ctx["test_qbittorrent_connection"](url, user, password))
 
     @bp.route("/api/test/audiobookshelf", methods=["POST"])
     def api_test_audiobookshelf():
         data = request.json or {}
         url = data.get("url", "").rstrip("/")
-        token = data.get("token", "")
+        token = _unmask(data.get("token", ""), config.ABS_TOKEN)
         return jsonify(ctx["test_audiobookshelf_connection"](url, token))
 
     @bp.route("/api/test/kavita", methods=["POST"])
     def api_test_kavita():
         data = request.json or {}
         url = data.get("url", "").rstrip("/")
-        api_key = data.get("api_key", "")
+        api_key = _unmask(data.get("api_key", ""), config.KAVITA_API_KEY)
         return jsonify(ctx["test_kavita_connection"](url, api_key))
 
     return bp
