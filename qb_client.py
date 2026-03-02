@@ -109,23 +109,36 @@ class QBittorrentClient:
     def add_torrent(self, url, title="", save_path=None, category=None):
         if not self._ensure_auth():
             return False
-        data = {
-            "urls": url,
+        common = {
             "savepath": save_path or config.QB_SAVE_PATH,
             "category": category or config.QB_CATEGORY,
         }
         try:
-            resp = self.session.post(f"{config.QB_URL}/api/v2/torrents/add", data=data, timeout=15)
+            # For non-magnet URLs (e.g. Prowlarr .torrent links), fetch the file
+            # ourselves and submit bytes directly so qBit doesn't need to reach
+            # internal hostnames (prowlarr:9696, etc.).
+            if url.startswith("magnet:"):
+                post_kwargs = {"data": {"urls": url, **common}}
+            else:
+                logger.debug("Fetching torrent file: %s", url[:120])
+                torrent_resp = self.session.get(url, timeout=20)
+                torrent_resp.raise_for_status()
+                logger.debug("Fetched torrent file: %d bytes", len(torrent_resp.content))
+                post_kwargs = {
+                    "data": common,
+                    "files": {"torrents": ("file.torrent", torrent_resp.content, "application/x-bittorrent")},
+                }
+            resp = self.session.post(f"{config.QB_URL}/api/v2/torrents/add", timeout=15, **post_kwargs)
             if resp.status_code == 403:
                 self.login()
-                resp = self.session.post(f"{config.QB_URL}/api/v2/torrents/add", data=data, timeout=15)
+                resp = self.session.post(f"{config.QB_URL}/api/v2/torrents/add", timeout=15, **post_kwargs)
             ok = resp.text == "Ok."
             if ok:
                 self._clear_last_error()
             elif resp.status_code == 403:
                 self._set_last_error("auth_failed", "qBittorrent rejected add_torrent request (403)")
             else:
-                self._set_last_error(f"http_{resp.status_code}", f"qBittorrent add_torrent returned HTTP {resp.status_code}")
+                self._set_last_error(f"http_{resp.status_code}", f"qBittorrent add_torrent returned HTTP {resp.status_code}: {resp.text[:80]}")
             return ok
         except Exception as e:
             logger.error("qBittorrent add torrent failed: %s", e)
