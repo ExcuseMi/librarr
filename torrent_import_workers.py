@@ -71,7 +71,9 @@ class TorrentImportWorkers:
 
         try:
             torrents = self.qb.get_torrents(category=self.config.QB_AUDIOBOOK_CATEGORY)
+            self.logger.debug("Audiobook torrents in qBit (category=%s): %d", self.config.QB_AUDIOBOOK_CATEGORY, len(torrents))
             for t in torrents:
+                self.logger.debug("  torrent: %s  progress=%.1f%%  hash=%s", t.get("name","?"), t.get("progress",0)*100, t.get("hash","?")[:8])
                 if t.get("progress", 0) >= 1.0 and t["hash"] not in self.imported_hashes:
                     save_path = t.get("content_path", t.get("save_path", ""))
                     qb_ab_path = self.config.QB_AUDIOBOOK_SAVE_PATH.rstrip("/")

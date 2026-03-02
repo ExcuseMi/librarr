@@ -120,10 +120,12 @@ class QBittorrentClient:
             if url.startswith("magnet:"):
                 post_kwargs = {"data": {"urls": url, **common}}
             else:
-                logger.debug("Fetching torrent file: %s", url[:120])
+                logger.info("Fetching torrent file from: %s", url[:120])
                 torrent_resp = self.session.get(url, timeout=20)
                 torrent_resp.raise_for_status()
-                logger.debug("Fetched torrent file: %d bytes", len(torrent_resp.content))
+                logger.info("Fetched torrent file: %d bytes (content-type: %s)",
+                            len(torrent_resp.content),
+                            torrent_resp.headers.get("content-type", "?"))
                 post_kwargs = {
                     "data": common,
                     "files": {"torrents": ("file.torrent", torrent_resp.content, "application/x-bittorrent")},
@@ -133,6 +135,7 @@ class QBittorrentClient:
                 self.login()
                 resp = self.session.post(f"{config.QB_URL}/api/v2/torrents/add", timeout=15, **post_kwargs)
             ok = resp.text == "Ok."
+            logger.info("qBittorrent add_torrent response: %r (ok=%s)", resp.text[:40], ok)
             if ok:
                 self._clear_last_error()
             elif resp.status_code == 403:

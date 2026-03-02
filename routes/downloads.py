@@ -327,7 +327,10 @@ def create_blueprint(ctx):
             else:
                 save_path = config.QB_SAVE_PATH
                 category = config.QB_CATEGORY
+            logger.info("Adding torrent: title=%r source=%s category=%s url=%.80s",
+                        title, source_name, category, url)
             success = qb.add_torrent(url, title, save_path=save_path, category=category)
+            logger.info("add_torrent result: success=%s title=%r", success, title)
             return jsonify({"success": success, "title": title})
 
         dup = ctx["duplicate_summary"](title=title, source_id=source_id)
