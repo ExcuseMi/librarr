@@ -121,15 +121,22 @@ class QBittorrentClient:
                 post_kwargs = {"data": {"urls": url, **common}}
             else:
                 logger.info("Fetching torrent file from: %s", url[:120])
-                torrent_resp = self.session.get(url, timeout=20)
-                torrent_resp.raise_for_status()
-                logger.info("Fetched torrent file: %d bytes (content-type: %s)",
-                            len(torrent_resp.content),
-                            torrent_resp.headers.get("content-type", "?"))
-                post_kwargs = {
-                    "data": common,
-                    "files": {"torrents": ("file.torrent", torrent_resp.content, "application/x-bittorrent")},
-                }
+                torrent_resp = self.session.get(url, timeout=20, allow_redirects=False)
+                location = torrent_resp.headers.get("Location", "")
+                if torrent_resp.status_code in (301, 302, 307, 308) and location.startswith("magnet:"):
+                    logger.info("Prowlarr redirected to magnet, using magnet URL")
+                    post_kwargs = {"data": {"urls": location, **common}}
+                else:
+                    if torrent_resp.status_code in (301, 302, 307, 308):
+                        torrent_resp = self.session.get(location, timeout=20)
+                    torrent_resp.raise_for_status()
+                    logger.info("Fetched torrent file: %d bytes (content-type: %s)",
+                                len(torrent_resp.content),
+                                torrent_resp.headers.get("content-type", "?"))
+                    post_kwargs = {
+                        "data": common,
+                        "files": {"torrents": ("file.torrent", torrent_resp.content, "application/x-bittorrent")},
+                    }
             resp = self.session.post(f"{config.QB_URL}/api/v2/torrents/add", timeout=15, **post_kwargs)
             if resp.status_code == 403:
                 self.login()
